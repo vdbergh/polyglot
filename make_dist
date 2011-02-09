@@ -1,0 +1,37 @@
+VERSION=1.4.64b
+# VERSION appears in
+# configure.ac
+# Changelog
+# debian/changelog
+# polyglot.spec
+# main.cpp
+RELEASE=1
+
+CC=/usr/bin/i586-mingw32msvc-gcc
+SRCDIR=`pwd`
+BUILDDIR=$SRCDIR/polyglot-${VERSION}
+DISTDIR=$SRCDIR/polyglot-release
+TARNAME=$SRCDIR/polyglot-${VERSION}.tar.gz
+RPMNAME=/usr/src/rpm/RPMS/*/polyglot-${VERSION}-${RELEASE}.*.rpm
+DEBNAME=$SRCDIR/polyglot_${VERSION}_*.deb
+EXENAME=$BUILDDIR/polyglot${VERSION}.exe
+DEBUGEXENAME=$BUILDDIR/polyglot${VERSION}-debug.exe
+
+mkdir $DISTDIR
+rm -rf $BUILDDIR
+make dist
+tar xvzf $TARNAME
+cp $TARNAME $DISTDIR
+cd $BUILDDIR
+./configure
+make deb
+cp $DEBNAME $DISTDIR
+sudo make rpm
+cp $RPMNAME $DISTDIR
+cp README $DISTDIR/manpage.txt
+cp ChangeLog $DISTDIR
+$CC -s -O2 *.c -o `basename $EXENAME`
+$CC -s -O2 -DDEBUG *.c -o `basename $DEBUGEXENAME`
+cp $EXENAME $DISTDIR
+cp $DEBUGEXENAME $DISTDIR
+
