@@ -17,6 +17,7 @@ DEBNAME=$SRCDIR/polyglot_${VERSION}_*.deb
 EXENAME=$BUILDDIR/polyglot${VERSION}.exe
 DEBUGEXENAME=$BUILDDIR/polyglot${VERSION}-debug.exe
 
+autoreconf
 mkdir $DISTDIR
 rm -rf $BUILDDIR
 make dist
