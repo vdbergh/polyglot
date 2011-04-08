@@ -1,3 +1,9 @@
+polyglot (1.4.66b) unstable; urgency=low
+	
+  *   Fix a printf 32 vs 64 bit format (crash) bug which manifested itself on windows.
+	
+ -- Michel Van den Bergh <michel.vandenbergh@uhasselt.be>  Fri, 8 Apr 2011 21:00:00 +0100	
+
 polyglot (1.4.65b) unstable; urgency=low
 	
   *   Bugfix: dump-book with -color black generated the file book_white.txt.
