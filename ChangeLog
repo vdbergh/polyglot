@@ -1,3 +1,5 @@
+========1.4.66b=================
+- Fix a printf 32 vs 64 bit format (crash) bug which manifested itself on windows.
 ========1.4.65b=================
 - Bugfix: dump-book with -color black generated the file book_white.txt.
 ========1.4.64b=================
