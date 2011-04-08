@@ -4,7 +4,7 @@ VERSION=1.4.66b
 # Changelog
 # debian/changelog
 # polyglot.spec
-# main.cpp
+# main.c
 RELEASE=1
 
 CC=/usr/bin/i586-mingw32msvc-gcc
