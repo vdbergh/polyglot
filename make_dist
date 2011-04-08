@@ -32,7 +32,7 @@ cp $RPMNAME $DISTDIR
 cp README $DISTDIR/manpage.txt
 cp ChangeLog $DISTDIR
 $CC -s -O2 *.c -o `basename $EXENAME`
-$CC -s -O2 -DDEBUG *.c -o `basename $DEBUGEXENAME`
+$CC -O2 -DDEBUG *.c -o `basename $DEBUGEXENAME`
 cp $EXENAME $DISTDIR
 cp $DEBUGEXENAME $DISTDIR
 
