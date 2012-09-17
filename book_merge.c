@@ -54,9 +54,9 @@ static void   write_integer (FILE * file, int size, uint64 n);
 
 // functions
 
-// header_merge()
+// variants_merge()
 
-void variants_merge(char ** variants, char *header1, char *header2){
+static void variants_merge(char ** variants, char *header1, char *header2){
 
     char *token;
     int ret,i,j;
