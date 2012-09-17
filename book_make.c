@@ -369,6 +369,7 @@ static void book_save(const char file_name[]) {
    for (pos = 0; pos < Book->size; pos++) {
 
       ASSERT(keep_entry(pos));
+      /* null keys are reserved for the header */
       if(Book->entry[pos].key!=U64(0x0)){
 	  write_integer(file,8,Book->entry[pos].key);
 	  write_integer(file,2,Book->entry[pos].move);
