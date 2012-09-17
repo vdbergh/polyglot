@@ -129,10 +129,6 @@ int book_move(const board_t * board, bool random) {
    ASSERT(board!=NULL);
    ASSERT(random==TRUE||random==FALSE);
 
-   // null keys are reserved for the header
-   if(board->key==U64(0x0)) return MoveNone;
-   
-
    // init
    
    list_clear(list);
@@ -189,6 +185,12 @@ void book_moves(list_t * list, const board_t * board) {
    ASSERT(list!=NULL);
 
    if(BookFile==NULL) return;
+
+   // null keys are reserved for the header
+   if(board->key==U64(0x0)) return;
+   
+
+
 
    // init
 
