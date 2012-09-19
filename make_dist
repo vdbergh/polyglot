@@ -1,4 +1,4 @@
-VERSION=1.4.67b
+VERSION=1.4.69b
 # VERSION appears in
 # configure.ac
 # Changelog
@@ -7,7 +7,7 @@ VERSION=1.4.67b
 # main.c
 RELEASE=1
 
-CC=/usr/bin/i586-mingw32msvc-gcc
+CC=/usr/bin/i686-pc-mingw32-gcc
 SRCDIR=`pwd`
 BUILDDIR=$SRCDIR/polyglot-${VERSION}
 DISTDIR=$SRCDIR/polyglot-release
