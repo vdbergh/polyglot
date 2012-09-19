@@ -29,17 +29,19 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 
 const char * pgheader_version="1.0";
 const char * pgheader_magic="@PG@";
 
-static char * errmsg[6]={
+static char * errmsg[]={
     "No error.",
     "OS error.",
     "Badly formatted input file.",
     "No header.",
     "Input and output file are the same.",
-    "Bad parameter."
+    "Bad parameter.",
+    "Bad header."
 };
 
 #ifdef _MSC_VER
@@ -70,6 +72,12 @@ int pgheader_detect(const char *infile){
     if(!fin){
 	return PGHEADER_OS_ERROR;
     }
+    fseek(fin,0L,SEEK_END);
+    if(ftell(fin)%16 !=0){
+	fclose(fin);
+	return PGHEADER_BAD_FORMAT;
+    }
+    fseek(fin,0L,SEEK_SET);
     r0=0;
     r1=0;
     r2=0;
@@ -129,22 +137,115 @@ int pgheader_create_raw(char **raw_header, const char *header, unsigned int *siz
     return PGHEADER_NO_ERROR;
 }
 
+int pgheader_parse(const char *header, char **variants, char **comment){
+    int ret,count,j;
+    char *header_dup;
+    char *token;
+    char *variant;
+    int nbpredef;
+    int cf;
+    header_dup=strdup(header);
+    *variants=malloc(strlen(header)+1);
+    *comment=malloc(strlen(header)+1);
+    ret=0;
+    (*variants)[0]='\0';
+    (*comment)[0]='\0';
+    token=strtok(header_dup,"\n");
+    cf=0;
+    if(token){  /* MAGIC */
+	token=strtok(NULL,"\n");
+	if(token){  /* VERSION */
+	    token=strtok(NULL,"\n");
+	    if(token){ /* PREDEF */
+		nbpredef=atoi(token);
+		/* parse variant fields */
+		token=strtok(NULL,"\n");
+		if(token){ /* NBVARIANTS */
+		    count=atoi(token);
+		    cf++;
+		    if(count>0){
+			for(j=0;j<count;j++){
+			    variant=strtok(NULL,"\n");
+			    cf++;
+			    if((*variants)[0]!=0){
+				strcat(*variants,"\n");
+			    }
+			    strcat(*variants,variant);
+			}
+		    }else{
+			ret=1;
+		    }
+		    
+		}else{
+		    ret=1;
+		}
+	    }else{
+		ret=1;
+	    }
+	}else{
+	    ret=1;
+	}
+    }else{
+	ret=1;
+    }
+    /* skip unknown fields */
+    if(ret==0 && cf<=nbpredef){
+	while((cf++)<nbpredef){
+	    token=strtok(NULL,"\n");
+	    if(!token){
+		ret=1;
+	    }
+	}
+    }
+    /* parse comment fields */
+    if(ret==0){
+	token=strtok(NULL,"\n");
+	while(token){
+	    if((*comment)[0]!=0){
+		strcat(*comment,"\n");
+	    }
+	    strcat(*comment,token);
+	    token=strtok(NULL,"\n");
+	}
+    }else{
+	free(*variants);
+	free(*comment);
+	free(header_dup);
+	*variants=NULL;
+	*comment=NULL;
+	return PGHEADER_BAD_HEADER;
+    }
+
+    free(header_dup);
+    return PGHEADER_NO_ERROR;
+
+}
+
 int pgheader_create(char **header, const char *variants, const char *comment){
-    int i,j;
+    int i;
     unsigned int nbvariants;
     unsigned int nbheader;
-    char nl[2];
     char c;
 
-    /* Step 1: the number of variants is one more than the number of commas */
+
+    /* Step 0: Validate variants: only lowercase, no spaces */
+
+    for(i=0;i<strlen(variants);i++){
+	c=variants[i];
+	if(c==' ' || isupper(c)){
+	    return PGHEADER_BAD_PARAMETER;
+	}
+    }
+
+    /* Step 1: the number of variants is one more than the number of linefeeds */
 
     nbvariants=1;
     for(i=0;i<strlen(variants);i++){
-	if(variants[i]==','){
+	if(variants[i]==0x0a){
 	    nbvariants++;
 	}
-	// Quick hack: at most 999 variants
-	if(nbvariants>999){
+	/* Quick hack: at most 998 variants */
+	if(nbvariants>998){
 	    return PGHEADER_BAD_PARAMETER;
 	}
     }
@@ -152,8 +253,13 @@ int pgheader_create(char **header, const char *variants, const char *comment){
 
     /* Step 2: estimate length */
 
-    nbheader=strlen(pgheader_magic)+1+strlen(pgheader_version)+1+3/*variants*/
-	+1+strlen(variants)+1+strlen(comment)+1;
+    nbheader=
+	strlen(pgheader_magic)+1
+	+strlen(pgheader_version)+1
+	+3/*nbpredef*/+1
+	+3/*nbvariants*/+1
+	+strlen(variants)+1
+	+strlen(comment)+1;
 
     /* Step 3: allocate memory */
 
@@ -164,44 +270,17 @@ int pgheader_create(char **header, const char *variants, const char *comment){
 
     /* Step 4: fill header */
 
-    /* make sure that the OS does not change newlines behind our back */
-
-    nl[0]=0x0a;
-    nl[1]='\0';
-
     strcpy(*header,pgheader_magic);
-    strcat(*header,nl);
+    strcat(*header,"\n");
     strcat(*header,pgheader_version); 
-    strcat(*header,nl);
+    strcat(*header,"\n");
+    sprintf(*header+strlen(*header),"%d",nbvariants+1); /* predef */
+    strcat(*header,"\n");
     sprintf(*header+strlen(*header),"%d",nbvariants);
-    strcat(*header,nl);
-    j=strlen(*header);
-    for(i=0;i<strlen(variants)+1;i++){
-	c=variants[i];
-	switch(c){
-	case ' ':
-	    break;
-	case ',':
-	    (*header)[j++]=0x0a;
-	    break;
-	default:
-	    (*header)[j++]=c;
-	}
-    }
-    strcat(*header,nl);
-    j=strlen(*header);
-    for(i=0;i<strlen(comment)+1;i++){
-	c=comment[i];
-	switch(c){
-	case '\\':
-	    if(comment[++i]=='n'){
-		(*header)[j++]=0x0a;
-	    }
-	    break;
-	default:
-	    (*header)[j++]=c;
-	}
-    }
+    strcat(*header,"\n");
+    strcat(*header,variants);
+    strcat(*header,"\n");
+    strcat(*header,comment);
 
     return PGHEADER_NO_ERROR;
 
@@ -360,16 +439,21 @@ int pgheader_write(const char *header, const char *infile, const char *outfile){
 	close(fout);
 	return PGHEADER_OS_ERROR;
     }
-    while(read(fin,&c,1)) {
-	if(write(fout,&c,1)!=1){
+        while((ret=read(fin,buf,16))==16){
+	if(write(fout,buf,ret)!=16){
 	    close(fin);
 	    close(fout);
 	    return PGHEADER_OS_ERROR;
 	}
     };
-
     close(fin);
     close(fout);
+
+    if(0<ret && ret<16){
+	return PGHEADER_BAD_FORMAT;
+    }else if(ret==-1){
+	return PGHEADER_OS_ERROR;
+    } 
 
     return PGHEADER_NO_ERROR;
 }
@@ -378,7 +462,16 @@ int pgheader_write(const char *header, const char *infile, const char *outfile){
 int pgheader_delete(const char *infile, const char *outfile){
     int fin, fout;
     char buf[16];
-    char c;
+    int ret;
+
+
+    /* make sure we are dealing with a polyglot book */
+
+    if((ret=pgheader_detect(infile))){
+	return ret;
+    }
+
+
     /* safety check! */
     if(!strcmp(infile,outfile)){
 	return PGHEADER_NAME_COLLISION;
@@ -397,7 +490,6 @@ int pgheader_delete(const char *infile, const char *outfile){
     }
 
     /* skip null records in input file */
-    /* TODO: check magic */
 
     while(1){
 	int j,r;
@@ -426,16 +518,22 @@ int pgheader_delete(const char *infile, const char *outfile){
 	close(fout);
 	return PGHEADER_OS_ERROR;
     }
-    while(read(fin,&c,1)) {
-	if(write(fout,&c,1)!=1){
+    
+    while((ret=read(fin,buf,16))==16){
+	if(write(fout,buf,ret)!=16){
 	    close(fin);
 	    close(fout);
 	    return PGHEADER_OS_ERROR;
 	}
     };
-
     close(fin);
     close(fout);
+
+    if(0<ret && ret<16){
+	return PGHEADER_BAD_FORMAT;
+    }else if(ret==-1){
+	return PGHEADER_OS_ERROR;
+    } 
 
     return PGHEADER_NO_ERROR;
 }
