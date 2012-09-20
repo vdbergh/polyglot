@@ -69,7 +69,7 @@ static void variants_merge(char ** variants, char *variants1, char *variants2){
 
     // Step 1: Initial malloc
 
-    *variants=malloc(strlen(variants1)+strlen(variants2)+1);
+    *variants=malloc(strlen(variants1)+strlen(variants2)+1+1);
     (*variants)[0]='\0';
 
     // Step 2: Loop through the variant names
