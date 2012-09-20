@@ -44,6 +44,10 @@ static char * errmsg[]={
     "Bad header."
 };
 
+#ifndef WIN32
+#define O_BINARY 0x0
+#endif
+
 #ifdef _MSC_VER
   typedef unsigned __int64 uint64_t;
 #else
@@ -150,25 +154,26 @@ int pgheader_parse(const char *header, char **variants, char **comment){
     ret=0;
     (*variants)[0]='\0';
     (*comment)[0]='\0';
-    token=strtok(header_dup,"\n");
+    token=strtok(header_dup,"\x0a");
     cf=0;
     if(token){  /* MAGIC */
-	token=strtok(NULL,"\n");
+	token=strtok(NULL,"\x0a");
 	if(token){  /* VERSION */
-	    token=strtok(NULL,"\n");
+	    token=strtok(NULL,"\x0a");
 	    if(token){ /* PREDEF */
 		nbpredef=atoi(token);
 		/* parse variant fields */
-		token=strtok(NULL,"\n");
+		token=strtok(NULL,"\x0a");
 		if(token){ /* NBVARIANTS */
 		    count=atoi(token);
 		    cf++;
-		    if(count>0){
+		    /* we allow a zero number of variants */
+		    if(count>=0){
 			for(j=0;j<count;j++){
-			    variant=strtok(NULL,"\n");
+			    variant=strtok(NULL,"\x0a");
 			    cf++;
 			    if((*variants)[0]!=0){
-				strcat(*variants,"\n");
+				strcat(*variants,"\x0a");
 			    }
 			    strcat(*variants,variant);
 			}
@@ -191,7 +196,7 @@ int pgheader_parse(const char *header, char **variants, char **comment){
     /* skip unknown fields */
     if(ret==0 && cf<=nbpredef){
 	while((cf++)<nbpredef){
-	    token=strtok(NULL,"\n");
+	    token=strtok(NULL,"\x0a");
 	    if(!token){
 		ret=1;
 	    }
@@ -199,13 +204,13 @@ int pgheader_parse(const char *header, char **variants, char **comment){
     }
     /* parse comment fields */
     if(ret==0){
-	token=strtok(NULL,"\n");
+	token=strtok(NULL,"\x0a");
 	while(token){
 	    if((*comment)[0]!=0){
-		strcat(*comment,"\n");
+		strcat(*comment,"\x0a");
 	    }
 	    strcat(*comment,token);
-	    token=strtok(NULL,"\n");
+	    token=strtok(NULL,"\x0a");
 	}
     }else{
 	free(*variants);
@@ -271,15 +276,15 @@ int pgheader_create(char **header, const char *variants, const char *comment){
     /* Step 4: fill header */
 
     strcpy(*header,pgheader_magic);
-    strcat(*header,"\n");
+    strcat(*header,"\x0a");
     strcat(*header,pgheader_version); 
-    strcat(*header,"\n");
+    strcat(*header,"\x0a");
     sprintf(*header+strlen(*header),"%d",nbvariants+1); /* predef */
-    strcat(*header,"\n");
+    strcat(*header,"\x0a");
     sprintf(*header+strlen(*header),"%d",nbvariants);
-    strcat(*header,"\n");
+    strcat(*header,"\x0a");
     strcat(*header,variants);
-    strcat(*header,"\n");
+    strcat(*header,"\x0a");
     strcat(*header,comment);
 
     return PGHEADER_NO_ERROR;
@@ -304,7 +309,7 @@ int pgheader_read(char **header, const char *infile){
 
     /* open input file */
 
-    fin=open(infile,O_RDONLY);
+    fin=open(infile,O_RDONLY|O_BINARY);
     if(fin==-1){
 	*header=NULL;
 	return PGHEADER_OS_ERROR;
@@ -383,11 +388,11 @@ int pgheader_write(const char *header, const char *infile, const char *outfile){
     }
 
     /* open files */
-    fin=open(infile,O_RDONLY);
+    fin=open(infile,O_RDONLY|O_BINARY);
     if(fin==-1){
 	return PGHEADER_OS_ERROR;
     }
-    fout=open(outfile,O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR);
+    fout=open(outfile,O_WRONLY|O_CREAT|O_TRUNC|O_BINARY,S_IRUSR|S_IWUSR);
     if(fout==-1){
 	close(fin);
 	return PGHEADER_OS_ERROR;
@@ -479,11 +484,11 @@ int pgheader_delete(const char *infile, const char *outfile){
 
 
     /* open files */
-    fin=open(infile,O_RDONLY);
+    fin=open(infile,O_RDONLY|O_BINARY);
     if(fin==-1){
 	return PGHEADER_OS_ERROR;
     }
-    fout=open(outfile,O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR);
+    fout=open(outfile,O_WRONLY|O_CREAT|O_TRUNC|O_BINARY,S_IRUSR|S_IWUSR);
     if(fout==-1){
 	close(fin);
 	return PGHEADER_OS_ERROR;
