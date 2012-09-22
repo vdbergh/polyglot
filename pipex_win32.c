@@ -286,15 +286,16 @@ static int pipex_read_data(pipex_t *pipex){
         // No protection. Access to nReadEnd is atomic.
         // It is not a problem that nReadEnd becomes smaller after the call.
         // This just means we have read less than we could have. 
-    ret=fgets(pipex->lpReadBuffer,
-              LINE_INPUT_MAX_CHAR-(pipex->nReadEnd),
-              pipex->fpInput);
-    if(!ret){
+    //    ret=fgets(pipex->lpReadBuffer,
+    //          LINE_INPUT_MAX_CHAR-(pipex->nReadEnd),
+    //          pipex->fpInput);
+    ret=ReadFile(pipex->hInput,pipex->lpReadBuffer,LINE_INPUT_MAX_CHAR-(pipex->nReadEnd),&dwBytes, NULL);
+    if(ret==FALSE){
         pipex_set_eof_input(pipex);
         (pipex->lpReadBuffer)[0]='\0';
         return 0;
     }
-    dwBytes=strlen(pipex->lpReadBuffer);
+    //    dwBytes=strlen(pipex->lpReadBuffer);
     (pipex->lpReadBuffer)[dwBytes]='\0';
     return dwBytes;
 }
