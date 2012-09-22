@@ -159,6 +159,7 @@ void pipex_open(pipex_t *pipex,
     if(!hThread){
         my_fatal("pipex_open(): %s",win32_error());
     }
+    pipex->hThread=hThread;
     pipex->dwWriteIndex=0;
     pipex_set_active(pipex);
 }
@@ -217,6 +218,7 @@ void pipex_exit(pipex_t *pipex, int kill_timeout) {
 	    my_sleep(WAIT_GRANULARITY);
 	    elapsed_time+=WAIT_GRANULARITY;
 	}else{
+	    my_log("POLYGLOT Child has exited.\n", WAIT_GRANULARITY);
 	    exited=TRUE;
 	    break;
 	}
@@ -225,6 +227,7 @@ void pipex_exit(pipex_t *pipex, int kill_timeout) {
     if(!exited){
       my_log("POLYGLOT Child wouldn't exit by itself. Terminating it.\n");
       TerminateProcess(pipex->hProcess,lpexit);
+      my_log("POLYGLOT Child should have exited.\n");
     }
     CloseHandle(pipex->hProcess);    
 
