@@ -8,10 +8,15 @@
 #define PGHEADER_NAME_COLLISION 4
 #define PGHEADER_BAD_PARAMETER 5
 #define PGHEADER_BAD_HEADER 6
-
+#define PGHEADER_TEST_FAILURE 7
 
 const char * pgheader_version;
 const char * pgheader_magic;
+
+/* Checks is this variant is known in the Chess Engine Communication
+   Protocol.
+*/
+int pgheader_known_variant(const char *variant);
 
 /* This does some heuristic tests to make it reasonably sure we are dealing
    with a Polyglot book.
@@ -38,10 +43,15 @@ int pgheader_create_raw(char **raw_header, const char *header, unsigned int *siz
 */
 int pgheader_read(char **header, const char *infile);
 
+/* "raw_header" must be freed if the function returns without error.
+*/
+int pgheader_read_raw(char **raw_header, const char *infile, unsigned int *size);
+
 int pgheader_write(const char *header, const char *infile, const char *outfile);
 int pgheader_delete(const char *infile, const char *outfile);
 
-void pgheader_error(const char *prompt, int ret);
+const char * pgheader_strerror(int pgerror);
 
+int pgheader_test();
 #endif
 

@@ -37,8 +37,6 @@ static book_t In1[1];
 static book_t In2[1];
 static book_t Out[1];
 
-static const char *default_header="@PG@\n1.0\n1\nnormal\n";
-
 // prototypes
 
 static void   book_clear    (book_t * book);
@@ -53,6 +51,26 @@ static uint64 read_integer  (FILE * file, int size);
 static void   write_integer (FILE * file, int size, uint64 n);
 
 // functions
+
+// in_variant_list()
+
+static bool in_variant_list(char * variants, char * variant){
+    char * variants_dup;
+    char * token;
+    bool ret;
+    variants_dup=strdup(variants);
+    token=strtok(variants_dup,"0x0a");
+    ret=FALSE;
+    while(variant){
+	if(!strcmp(token,variant)){
+	   ret=TRUE;
+	   break;
+	}
+	token=strtok(NULL,"\x0a");
+    }
+    free(variants_dup);
+}
+
 
 // variants_merge()
 
@@ -81,9 +99,7 @@ static void variants_merge(char ** variants, char *variants1, char *variants2){
 	variants_list=(i==0)?variants1_dup:variants2_dup;
 	variant=strtok(variants_list,"\x0a");
 	while(variant){
-	    // TODO: this does not take into account that one variant name
-	    // may be contained in another.
-	    if(!strstr(*variants,variant)){
+	    if(i==0 || !in_variant_list(*variants,variant)){
 		if((*variants)[0]!=0){
 		    strcat(*variants,"\x0a");
 		}

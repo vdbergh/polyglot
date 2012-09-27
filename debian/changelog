@@ -1,3 +1,9 @@
+polyglot (1.4.71b) unstable; urgency=low
+	
+  *  Account for the possibility that one variant name may be contained in another.
+	
+ -- Michel Van den Bergh <michel.vandenbergh@uhasselt.be>  Wed, 27 Sept 2012 21:00:00 +0100	
+
 polyglot (1.4.70b) unstable; urgency=low
 	
   *  Previous version did not work correctly on Windows.

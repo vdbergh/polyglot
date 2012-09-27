@@ -30,9 +30,42 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <errno.h>
 
 const char * pgheader_version="1.0";
 const char * pgheader_magic="@PG@";
+
+const char * pgheader_known_variants[]={
+    "normal",
+    "wildcastle",
+    "nocastle",
+    "fischerandom",
+    "bughouse",
+    "crazyhouse",
+    "losers",
+    "suicide",
+    "giveaway",
+    "twokings",
+    "kriegspiel",
+    "atomic",
+    "3check",
+    "xiangqi",
+    "shogi",
+    "capablanca",
+    "gothic",
+    "falcon",
+    "shatranj",
+    "courier",
+    "knightmate",
+    "berolina",
+    "janus",
+    "caparandom",
+    "cylinder",
+    "super",
+    "great",
+    "unknown",
+    NULL
+};
 
 static char * errmsg[]={
     "No error.",
@@ -41,7 +74,8 @@ static char * errmsg[]={
     "No header.",
     "Input and output file are the same.",
     "Bad parameter.",
-    "Bad header."
+    "Bad header.",
+    "Self test failure."
 };
 
 #ifndef WIN32
@@ -66,6 +100,492 @@ static int int_from_file(FILE *f, int l, uint64_t *r){
     return 0;
 }
 
+
+static int is_version(char *version){
+    int i=0;
+    char c;
+    int state;
+    state=0;
+    while(state!=50 && state<=99){
+	c=version[i++];
+	if(isdigit(c) && c!='0'){
+	    c='1';
+	}
+	switch(state){
+	case 0:
+	    switch(c){
+	    case '0':
+		state=1;
+		continue;
+	    case '1':
+		state=5;
+		continue;
+	    default:
+		state=100+state;
+		continue;
+	    }
+	case 1:
+	    switch(c){
+	    case '.':
+		state=2;
+		continue;
+	    default:
+		state=100+state;
+		continue;
+	    }
+	case 5:
+	    switch(c){
+	    case '0':
+	    case '1':
+		state=5;
+		continue;
+	    case '.':
+		state=2;
+		continue;
+	    default:
+		state=100+state;
+		continue;
+	    }
+	case 2:
+	    switch(c){
+	    case '0':
+		state=3;
+		continue;
+	    case '1':
+		state=6;
+		continue;
+	    default:
+		state=100+state;
+		continue;
+	    }
+	case 6:
+	    switch(c){
+	    case '0':
+	    case '1':
+		state=6;
+		continue;
+	    case '\0':
+		state=50;
+		continue;
+	    default:
+		state=100+state;
+		continue;
+	    }
+	case 3:
+	    switch(c){
+	    case '\0':
+		state=50;
+		continue;
+	    default:
+		state=100+state;
+		continue;
+	    }
+	default:
+	    fprintf(stderr,"is_version(): Illegal state=%d\n",state);
+	    return 0;
+	}
+    }
+    if(state==50){
+	return 1;
+    }else{
+	return 0;
+    }
+}
+
+
+static int test_version(void){
+    char **test;
+    int i,ret;
+    char *input[]= {"1,0","1.0","2.0","0.0","00.0","10.0","10.01","10.10",NULL};
+    int result[]=  {0,    1,    1,    1,    0,     1,     0,      1      };
+    test=input;
+    i=0;
+    ret=1;
+    while((*test)!=NULL){
+	if(is_version(*test)!=result[i]){
+	    fprintf(stderr,"test_version(): test %d failed with test=\"%s\"\n",i,*test);
+	    ret=0;
+	}
+	test++;
+	i++;
+    }
+    return ret;
+}
+
+static int is_number(char *version){
+    int i=0;
+    char c;
+    int state;
+    state=0;
+    while(state!=50 && state<=99){
+	c=version[i++];
+	if(isdigit(c) && c!='0'){
+	    c='1';
+	}
+	switch(state){
+	case 0:
+	    switch(c){
+	    case '0':
+		state=1;
+		continue;
+	    case '1':
+		state=5;
+		continue;
+	    default:
+		state=100+state;
+	    continue;
+	    }
+	case 1:
+	    switch(c){
+	    case '\0':
+		state=50;
+		continue;
+	    default:
+		state=100+state;
+		continue;
+	    }
+	case 5:
+	    switch(c){
+	    case '0':
+	    case '1':
+		state=5;
+		continue;
+	    case '\0':
+		state=50;
+		continue;
+	    default:
+		state=100+state;
+		continue;
+	    }
+	default:
+	    fprintf(stderr,"is_number(): Illegal state=%d\n",state);
+	    return 0;
+	}
+    }    
+    if(state==50){
+	return 1;
+    }else{
+	return 0;
+    }
+}
+
+static int test_number(void){
+    char **test;
+    int i,ret;
+    char *input[]= {"0","00","-2","02","0.0"," 0", NULL};
+    int result[]=  {1,   0,  0,   0,    0,     0};
+    test=input;
+    i=0;
+    ret=1;
+    while((*test)!=NULL){
+	if(is_number(*test)!=result[i]){
+	    fprintf(stderr,"test_number(): test %d failed with test=\"%s\"\n",i,*test);
+	    ret=0;
+	}
+	test++;
+	i++;
+    }
+    return ret;
+}
+
+static int is_variant(char *variant){
+    int i=0;
+    char c;
+    int state;
+    state=0;
+    while(state!=50 && state<=99){
+	c=variant[i++];
+	if(isupper(c)){
+	    c='A';
+	}else if(isprint(c) && c!=' '){
+	    c='@';
+	}
+	switch(state){
+	case 0:
+	    switch(c){
+	    case '@':
+		state=0;
+		continue;
+	    case '\0':
+		state=50;
+		continue;
+	    default:
+		state=100+state;
+		continue;
+	    }
+	default:
+	    fprintf(stderr,"is_variant(): Illegal state=%d\n",state);
+	    return 0;
+	}
+    }
+    if(state==50){
+	return 1;
+    }else{
+	return 0;
+    }
+}
+
+int test_variant(void){
+    char **test;
+    int i,ret;
+    char *input[]= {"normal",
+		    " normal",
+		    "normal@",
+		    "nor mal",
+		    "Normal",
+		    NULL};
+    int result[]=  {1,    0,    1,    0,    0};
+    test=input;
+    i=0;
+    ret=1;
+    while((*test)!=NULL){
+	if(is_variant(*test)!=result[i]){
+	    fprintf(stderr,"test_variant(): test %d failed with test=\"%s\"\n",i,*test);
+	    ret=0;
+	}
+	test++;
+	i++;
+    }
+    return ret;
+}
+
+
+int pgheader_known_variant(const char *variant){
+    int i=0;
+    const char *entry;
+    while((entry=pgheader_known_variants[i++])){
+	if(!strcmp(entry,variant)){
+	    return PGHEADER_NO_ERROR;
+	}
+    }
+    return PGHEADER_BAD_PARAMETER;
+}
+
+
+static int is_predef(char *predef){
+    int i=0;
+    char c;
+    int state;
+    state=0;
+    while(state!=50 && state<=99){
+	c=predef[i++];
+	switch(state){
+	case 0:
+	    switch(c){
+	    case ' ':
+		state=100+state;
+		continue;
+	    case '\0':
+		state=50;
+		continue;
+	    default:
+		state=1;
+		continue;
+	    }
+	case 1:
+	    switch(c){
+	    case '\0':
+		state=50;
+		continue;
+	    case ' ':
+		state=2;
+		continue;
+	    default:
+		state=1;
+		continue;
+	    }
+	case 2:
+	    switch(c){
+	    case ' ':
+		state=2;
+		continue;
+	    case '\0':
+		state=100+state;
+		continue;
+	    default:
+		state=1;
+		continue;
+	    }
+	default:
+	    fprintf(stderr,"is_predef(): Illegal state=%d\n",state);
+	    return 0;
+	}
+    }
+    if(state==50){
+	return 1;
+    }else{
+	return 0;
+    }
+}
+
+int test_predef(void){
+    char **test;
+    int i,ret;
+    char *input[]= {"nobody@nowhere.com",
+		    " nobody@nowhere.com",
+		    "nobody@nowhere.com ",
+		    "nobody nowhere.com",
+		    " nobody nowhere.com",
+		    "nobody nowhere.com ",
+		    NULL};
+    int result[]=  {1,    0,    0,    1,    0,     0};
+    test=input;
+    i=0;
+    ret=1;
+    while((*test)!=NULL){
+	if(is_predef(*test)!=result[i]){
+	    fprintf(stderr,"test_predef(): test %d failed with test=\"%s\"\n",i,*test);
+	    ret=0;
+	}
+	test++;
+	i++;
+    }
+    return ret;
+}
+
+
+
+
+static int is_magic(char *magic){
+    if(!strcmp(magic,pgheader_magic)){
+	return 1;
+    }else{
+	return 0;
+    }
+}
+
+
+int pgheader_test(){
+    int ret;
+    ret=1;
+    ret&=test_version();
+    ret&=test_variant();
+    ret&=test_predef();
+    ret&=test_number();
+    if(ret){
+	return PGHEADER_NO_ERROR;
+    }else{
+	return PGHEADER_TEST_FAILURE;
+    }
+}
+
+int pgheader_parse(const char *header, char **variants, char **comment){
+    int state;
+    int nbvariants=-1;
+    int nbpredefs=-1;
+    char *token;
+    char *header_dup;
+    header_dup=strdup(header);
+    token=strtok(header_dup,"\x0a");
+    *comment=malloc(strlen(header)+1);
+    *variants=malloc(strlen(header)+1);
+    (*variants)[0]='\0';
+    (*comment)[0]='\0';
+
+    state=0;
+    while(token && state<=99){
+	//	printf("state=%d token=\"%10s\" variants=\"%10s\" comment=\"%10s\" nbvariants=%d nbpredefs=%d\n",state,token,*variants,*comment,nbvariants,nbpredefs);
+	switch(state){
+	case 0:
+	    if(is_magic(token)){
+		state=1;
+	    }else{
+		state=100+state;
+	    }
+	    break;
+	case 1:
+	    if(is_version(token)){
+		state=2;
+	    }else{
+		state=100+state;
+	    }
+	    break;
+	case 2:
+	    if(is_number(token)){
+		nbpredefs=atoi(token);
+		if(nbpredefs==0){
+		    state=100+state;
+		}else{
+		    state=3;
+		}
+	    }else{
+		state=100+state;
+	    }
+	    break;
+	case 3:
+	    if(is_number(token)){
+		nbvariants=atoi(token);
+		if(nbpredefs<=nbvariants){
+		    state=100+state;
+		}else{
+		    nbpredefs--;
+		    if(nbpredefs==0){
+			state=50;
+		    }else if(nbvariants==0){
+			state=5;
+		    }else{
+			state=4;
+		    }
+		}
+	    }else{
+		state=100+state;
+	    }
+	    break;
+	case 4:
+	    if(is_variant(token)){
+		if((*variants)[0]!=0){
+		    strcat(*variants,"\x0a");
+		}
+		strcat(*variants,token);
+		nbvariants--;
+		nbpredefs--;
+		if(nbvariants==0){
+		    if(nbpredefs==0){
+			state=50;
+		    }else{
+			state=5;
+		    }
+		}else{
+		    state=4;
+		}
+	    }else{
+		state=100+state;
+	    }
+	    break;
+	case 5:
+	    if(is_predef(token)){
+		nbpredefs--;
+		if(nbpredefs==0){
+		    state=50;
+		}else{
+		    state=5;
+		}
+	    }else{
+		state=100+state;
+	    }
+	    break;
+	case 50:
+	    if((*comment)[0]!=0){
+		strcat(*comment,"\x0a");
+	    }
+	    strcat(*comment,token);
+	    state=50;
+	    break;
+	}
+	token=strtok(NULL,"\x0a");
+    }
+    free(header_dup);
+    if(state==50){
+	return PGHEADER_NO_ERROR;
+    }else{
+	free(*variants);
+	free(*comment);
+	*variants=NULL;
+	*comment=NULL;
+	return PGHEADER_BAD_HEADER;
+    }
+
+}
 
 int pgheader_detect(const char *infile){
     FILE *fin;
@@ -103,19 +623,16 @@ int pgheader_detect(const char *infile){
     return PGHEADER_NO_ERROR;
 }
 
-void pgheader_error(const char *prompt, int ret){
-    switch(ret){
-    case PGHEADER_NO_ERROR:
-	break;
-    case PGHEADER_OS_ERROR:
-	perror(prompt);
-	break;
-    default:
-	fprintf(stderr,"%s: %s\n",prompt,errmsg[ret]);
-	break;
-	
+
+
+const char *pgheader_strerror(int pgerror){
+    if(pgerror==PGHEADER_OS_ERROR){
+	return strerror(errno);
+    }else{
+	return errmsg[pgerror];
     }
 }
+
 
 int pgheader_create_raw(char **raw_header, const char *header, unsigned int *size){
     unsigned int b,i,j,k;
@@ -141,120 +658,36 @@ int pgheader_create_raw(char **raw_header, const char *header, unsigned int *siz
     return PGHEADER_NO_ERROR;
 }
 
-int pgheader_parse(const char *header, char **variants, char **comment){
-    int ret,count,j;
-    char *header_dup;
-    char *token;
-    char *variant;
-    int nbpredef;
-    int cf;
-    header_dup=strdup(header);
-    *variants=malloc(strlen(header)+1);
-    *comment=malloc(strlen(header)+1);
-    ret=0;
-    (*variants)[0]='\0';
-    (*comment)[0]='\0';
-    token=strtok(header_dup,"\x0a");
-    cf=0;
-    if(token){  /* MAGIC */
-	token=strtok(NULL,"\x0a");
-	if(token){  /* VERSION */
-	    token=strtok(NULL,"\x0a");
-	    if(token){ /* PREDEF */
-		nbpredef=atoi(token);
-		/* parse variant fields */
-		token=strtok(NULL,"\x0a");
-		if(token){ /* NBVARIANTS */
-		    count=atoi(token);
-		    cf++;
-		    /* we allow a zero number of variants */
-		    if(count>=0){
-			for(j=0;j<count;j++){
-			    variant=strtok(NULL,"\x0a");
-			    cf++;
-			    if((*variants)[0]!=0){
-				strcat(*variants,"\x0a");
-			    }
-			    strcat(*variants,variant);
-			}
-		    }else{
-			ret=1;
-		    }
-		    
-		}else{
-		    ret=1;
-		}
-	    }else{
-		ret=1;
-	    }
-	}else{
-	    ret=1;
-	}
-    }else{
-	ret=1;
-    }
-    /* skip unknown fields */
-    if(ret==0 && cf<=nbpredef){
-	while((cf++)<nbpredef){
-	    token=strtok(NULL,"\x0a");
-	    if(!token){
-		ret=1;
-	    }
-	}
-    }
-    /* parse comment fields */
-    if(ret==0){
-	token=strtok(NULL,"\x0a");
-	while(token){
-	    if((*comment)[0]!=0){
-		strcat(*comment,"\x0a");
-	    }
-	    strcat(*comment,token);
-	    token=strtok(NULL,"\x0a");
-	}
-    }else{
-	free(*variants);
-	free(*comment);
-	free(header_dup);
-	*variants=NULL;
-	*comment=NULL;
-	return PGHEADER_BAD_HEADER;
-    }
-
-    free(header_dup);
-    return PGHEADER_NO_ERROR;
-
-}
 
 int pgheader_create(char **header, const char *variants, const char *comment){
     int i;
     unsigned int nbvariants;
     unsigned int nbheader;
     char c;
+    char *variants__;
+    char *token;
 
 
-    /* Step 0: Validate variants: only lowercase, no spaces */
+    /* Step 1: Validate and count variants */
 
-    for(i=0;i<strlen(variants);i++){
-	c=variants[i];
-	if(c==' ' || isupper(c)){
+    nbvariants=0;
+    variants__=strdup(variants);
+    token=strtok(variants__,"\x0a");
+    while(token){
+	if(!is_variant(token)){
+	    free(variants__);
 	    return PGHEADER_BAD_PARAMETER;
 	}
+	nbvariants++;
+	token=strtok(NULL,"0x0a");
     }
+    free(variants__);
+     
 
-    /* Step 1: the number of variants is one more than the number of linefeeds */
-
-    nbvariants=1;
-    for(i=0;i<strlen(variants);i++){
-	if(variants[i]==0x0a){
-	    nbvariants++;
-	}
-	/* Quick hack: at most 998 variants */
-	if(nbvariants>998){
-	    return PGHEADER_BAD_PARAMETER;
-	}
+    /* Quick hack: at most 998 variants */
+    if(nbvariants>998){
+	return PGHEADER_BAD_PARAMETER;
     }
-
 
     /* Step 2: estimate length */
 
@@ -293,45 +726,68 @@ int pgheader_create(char **header, const char *variants, const char *comment){
 
 
 int pgheader_read(char **header, const char *infile){
+    unsigned int size, ret;
+    int i;
+    
+    /* read bytes in input file */
+
+    ret=pgheader_read_raw(header,infile,&size);
+    if(ret){
+	return ret;
+    }
+    if(size==0){
+	free(*header);
+	*header=NULL;
+	return PGHEADER_NO_HEADER;
+    }
+
+    for(i=0;i<size;i++){
+	if((*header)[i]=='\0'){
+	    return PGHEADER_NO_ERROR;
+	}
+    }
+    free(*header);
+    (*header)=NULL;
+    return PGHEADER_BAD_HEADER;
+}
+
+int pgheader_read_raw(char **raw_header, const char *infile, unsigned int *size){
     int fin;
     char buf[16];
     unsigned int nbheader;
-    unsigned int read_bytes;
-
     /* initial malloc */
 
     nbheader=2048;
-    *header=malloc(nbheader);
-    if(!(*header)){
+    *raw_header=malloc(nbheader);
+    if(!(*raw_header)){
 	return PGHEADER_OS_ERROR;
     }
-    read_bytes=0;
+    (*size)=0;
 
     /* open input file */
 
     fin=open(infile,O_RDONLY|O_BINARY);
     if(fin==-1){
-	*header=NULL;
+	free(*raw_header);
+	*raw_header=NULL;
 	return PGHEADER_OS_ERROR;
     }
 
 
     /* read bytes in input file */
 
+    *size=0;
     while(1){
 	int j,r;
 	int zero;
-	int last;
-	/* enlarge buffer if necessary */
-	if(read_bytes>=nbheader){
-	    nbheader*=2;
-	    *header=realloc(*header,nbheader);
-	}
-	
 	r=read(fin,buf,16);
+	if(r==0){
+	    close(fin);
+	    return PGHEADER_NO_ERROR;
+	}
 	if(r<16){
-	    free(*header);
-	    *header=NULL;
+	    free(*raw_header);
+	    *raw_header=NULL;
 	    close(fin);
 	    return PGHEADER_BAD_FORMAT;
 	}
@@ -342,28 +798,26 @@ int pgheader_read(char **header, const char *infile){
 	    }
 	}
 	if(!zero){
-	    /* if we encounter a non null record here it means 
-	       we have not bailed out earlier */
-	    free(*header);
-	    *header=NULL;
 	    close(fin);
-	    return PGHEADER_NO_HEADER;
+	    return PGHEADER_NO_ERROR;
 	}
-	last=0;
+	/* enlarge buffer if necessary */
+	if((*size)>=nbheader){
+	    nbheader*=2;
+	    *raw_header=realloc(*raw_header,nbheader);
+	}
 	for(j=8;j<16;j++){
-	    (*header)[read_bytes+j-8]=buf[j];
-	    if(buf[j]==0){
-		last=1;
-	    }
+	    (*raw_header)[(*size)+j-8]=buf[j];
+	}
+	(*size)+=8;
 
-	}
-	if(last){
-	    break;
-	}
-	read_bytes+=8;
     }
+    /* We never get here! */
+    fprintf(stderr,"pgheader_read_raw(): internal error\n");
     close(fin);
-    return PGHEADER_NO_ERROR;
+    return PGHEADER_BAD_FORMAT;
+
+
 }
 
 

@@ -1,3 +1,5 @@
+========1.4.71b=================	
+- account for the possibility that one variant name may be contained in another.
 ========1.4.70b=================	
 - merge-book did not work correctly on Windows.
 ========1.4.69b=================	
