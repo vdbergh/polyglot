@@ -10,8 +10,8 @@
 #define PGHEADER_BAD_HEADER 6
 #define PGHEADER_TEST_FAILURE 7
 
-const char * pgheader_version;
-const char * pgheader_magic;
+//const char * pgheader_version;
+//const char * pgheader_magic;
 
 /* Checks is this variant is known in the Chess Engine Communication
    Protocol.
